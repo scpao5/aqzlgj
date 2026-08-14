@@ -17,6 +17,8 @@
 package com.sbby.aqzlgj;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -29,8 +31,37 @@ public class CodeData {
     public static final String CATEGORY_NETWORK = "钥匙类";
     public static final String CATEGORY_FILE = "针剂类";
     public static final String CATEGORY_TOOLS = "操作指令";
+    public static final String CATEGORY_MIX = "大杂烩";
 
     private static List<CodeItem> allCodes;
+    private static boolean isLoading = false;
+    private static LoadListener loadListener;
+
+    public interface LoadListener {
+        void onLoadComplete();
+        void onLoadError(String error);
+    }
+
+    public static void setLoadListener(LoadListener listener) {
+        loadListener = listener;
+    }
+
+    public static List<CodeItem> getAllCommands(Context context) {
+        init(context);
+        int waitCount = 0;
+        while (isLoading && waitCount < 30) {
+            try {
+                Thread.sleep(100);
+                waitCount++;
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+        if (allCodes == null) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(allCodes);
+    }
 
     private static void addFromFile(Context context, String fileName, String category) {
         try {
@@ -54,14 +85,72 @@ public class CodeData {
         }
     }
 
-    public static void init(Context context) {
-        if (allCodes == null) {
-            allCodes = new ArrayList<>();
-            addFromFile(context, "刀皮类.txt", CATEGORY_BASIC);
-            addFromFile(context, "战术装备含食物.txt", CATEGORY_STORAGE);
-            addFromFile(context, "钥匙类.txt", CATEGORY_NETWORK);
-            addFromFile(context, "针剂类.txt", CATEGORY_FILE);
-            addFromFile(context, "操作指令.txt", CATEGORY_TOOLS);
+    public static void init(final Context context) {
+        if (allCodes != null) return;
+        if (isLoading) return;
+
+        isLoading = true;
+        final Handler handler = new Handler(Looper.getMainLooper());
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final List<CodeItem> tempList = new ArrayList<>();
+
+                    loadFileTo(context, "刀皮类.txt", CATEGORY_BASIC, tempList);
+                    loadFileTo(context, "战术装备含食物.txt", CATEGORY_STORAGE, tempList);
+                    loadFileTo(context, "钥匙类.txt", CATEGORY_NETWORK, tempList);
+                    loadFileTo(context, "针剂类.txt", CATEGORY_FILE, tempList);
+                    loadFileTo(context, "操作指令.txt", CATEGORY_TOOLS, tempList);
+                    loadFileTo(context, "大杂烩.txt", CATEGORY_MIX, tempList);
+
+                    allCodes = tempList;
+                    isLoading = false;
+
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loadListener != null) {
+                                loadListener.onLoadComplete();
+                            }
+                        }
+                    });
+
+                } catch (final Exception e) {
+                    isLoading = false;
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (loadListener != null) {
+                                loadListener.onLoadError(e.getMessage());
+                            }
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private static void loadFileTo(Context context, String fileName, String category, List<CodeItem> target) {
+        try {
+            InputStream is = context.getAssets().open(fileName);
+            BufferedReader br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+            String line;
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.length() == 0) continue;
+                int index = line.indexOf("|");
+                if (index > 0) {
+                    String title = line.substring(0, index).trim();
+                    String code = line.substring(index + 1).trim();
+                    target.add(new CodeItem(title, code, category));
+                }
+            }
+            br.close();
+            is.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -72,12 +161,14 @@ public class CodeData {
         list.add(CATEGORY_NETWORK);
         list.add(CATEGORY_FILE);
         list.add(CATEGORY_TOOLS);
+        list.add(CATEGORY_MIX);
         return list;
     }
 
     public static List<CodeItem> getCodesByCategory(Context context, String category) {
         init(context);
         List<CodeItem> result = new ArrayList<>();
+        if (allCodes == null) return result;
         for (CodeItem item : allCodes) {
             if (item.category.equals(category)) {
                 result.add(item);
@@ -89,6 +180,7 @@ public class CodeData {
     public static List<CodeItem> searchCodes(Context context, String keyword) {
         init(context);
         List<CodeItem> result = new ArrayList<>();
+        if (allCodes == null) return result;
         keyword = keyword.toLowerCase();
         for (CodeItem item : allCodes) {
             if (item.title.toLowerCase().contains(keyword) || item.code.toLowerCase().contains(keyword)) {
@@ -100,5 +192,6 @@ public class CodeData {
 
     public static void clearCache() {
         allCodes = null;
+        isLoading = false;
     }
 }

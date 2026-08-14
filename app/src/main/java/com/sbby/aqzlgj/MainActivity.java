@@ -18,50 +18,55 @@
 package com.sbby.aqzlgj;
 
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.CountDownTimer;
+import android.provider.Settings;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.*;
+import android.widget.BaseAdapter;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+import android.widget.RelativeLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import android.os.CountDownTimer;
-import android.widget.Button;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.GradientDrawable;
-import android.view.Gravity;
-import android.widget.ScrollView;
-import android.os.CountDownTimer;
-import android.app.Dialog;
 
 public class MainActivity extends Activity {
 
     private List<Map<String, String>> categoryData;
     private ListView categoryList;
     private EditText searchBox;
+    private Button floatToggleBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 检查是否已同意用户协议
         SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
         boolean agreed = prefs.getBoolean("agreement_accepted", false);
         if (!agreed) {
             showAgreementDialog();
-            return; // 未同意时不加载主界面
+            return;
         }
 
-        // 已同意，正常加载界面
         initMainUI();
     }
 
@@ -71,12 +76,12 @@ public class MainActivity extends Activity {
         RelativeLayout root = new RelativeLayout(this);
         root.setBackgroundColor(Color.parseColor("#F0F4F8"));
 
-        // 顶部蓝色区域
         LinearLayout topBar = new LinearLayout(this);
         topBar.setId(1);
-        topBar.setOrientation(LinearLayout.VERTICAL);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setBackgroundColor(Color.parseColor("#2196F3"));
-        topBar.setPadding(dp(20), dp(15), dp(20), dp(15));
+        topBar.setPadding(dp(20), dp(8), dp(20), dp(8));
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
         RelativeLayout.LayoutParams topParams = new RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.MATCH_PARENT,
                 RelativeLayout.LayoutParams.WRAP_CONTENT);
@@ -89,8 +94,21 @@ public class MainActivity extends Activity {
         title.setTextColor(Color.WHITE);
         title.setTextSize(22);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setGravity(View.TEXT_ALIGNMENT_CENTER);
+        title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
         topBar.addView(title);
+
+        floatToggleBtn = new Button(this);
+        floatToggleBtn.setText("悬浮窗");
+        floatToggleBtn.setTextColor(Color.WHITE);
+        floatToggleBtn.setBackgroundColor(Color.TRANSPARENT);
+        floatToggleBtn.setPadding(dp(10), dp(5), dp(10), dp(5));
+        floatToggleBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                toggleFloatWindow();
+            }
+        });
+        topBar.addView(floatToggleBtn);
 
         View divider = new View(this);
         divider.setId(2);
@@ -121,7 +139,6 @@ public class MainActivity extends Activity {
         searchBoxContainer.setLayoutParams(new LinearLayout.LayoutParams(0, dp(60), 1));
         searchArea.addView(searchBoxContainer);
 
-        // 搜索图标
         ImageView searchIcon = new ImageView(this);
         searchIcon.setImageResource(R.drawable.ic_search);
         searchIcon.setColorFilter(Color.parseColor("#9E9E9E"));
@@ -211,138 +228,166 @@ public class MainActivity extends Activity {
         setContentView(root);
         loadCategories();
 
-        PrivilegeManager.init(this, new PrivilegeManager.InitCallback() {
+        PrivilegeManager.init(this);
+
+        refreshFloatButtonText();
+    }
+
+    private void toggleFloatWindow() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            Toast.makeText(this, "请授予悬浮窗权限", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, 1001);
+            return;
+        }
+        if (FloatWindowService.isRunning) {
+            stopService(new Intent(this, FloatWindowService.class));
+        } else {
+            startService(new Intent(this, FloatWindowService.class));
+        }
+        refreshFloatButtonText();
+    }
+
+    private void refreshFloatButtonText() {
+        if (floatToggleBtn != null) {
+            if (FloatWindowService.isRunning) {
+                floatToggleBtn.setText("关闭悬浮");
+            } else {
+                floatToggleBtn.setText("开启悬浮");
+            }
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        refreshFloatButtonText();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 1001) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
+                toggleFloatWindow();
+            } else {
+                Toast.makeText(this, "未授予悬浮窗权限", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void showAgreementDialog() {
+        final Dialog dialog = new Dialog(this);
+        dialog.setCancelable(false);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        LinearLayout mainLayout = new LinearLayout(this);
+        mainLayout.setOrientation(LinearLayout.VERTICAL);
+        mainLayout.setBackgroundColor(Color.WHITE);
+        mainLayout.setPadding(dp(24), dp(20), dp(24), dp(20));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(dp(16));
+        bg.setColor(Color.WHITE);
+        mainLayout.setBackground(bg);
+
+        TextView title = new TextView(this);
+        title.setText("用户协议");
+        title.setTextSize(20);
+        title.setTextColor(Color.parseColor("#1F2937"));
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, 0, 0, dp(16));
+        mainLayout.addView(title);
+
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(400)));
+        mainLayout.addView(scrollView);
+
+        TextView content = new TextView(this);
+        content.setText("欢迎使用暗区指令工具！\n\n"
+                + "1. 本应用是开源软件，遵循 GNU General Public License v3.0 (GPL-3.0) 许可证。\n"
+                + "   您有权自由使用、修改、分发本软件，但任何修改后的版本也必须以 GPL-3.0 开源。\n"
+                + "   源代码地址：\n"
+                + "   GitHub: https://github.com/scpao5/aqzlgj/\n"
+                + "   Gitee: https://gitee.com/scpao5/aqzlgj/\n\n"
+                + "2. 任何个人或组织不得将本应用或其修改版本用于商业盈利目的（即“圈钱”），包括但不限于：\n"
+                + "   - 售卖 APK、收费提供下载\n"
+                + "   - 内置广告、收取会员费\n"
+                + "   - 以“代刷”、“代练”等名义变相收费\n\n"
+                + "3. 您通过本应用执行的所有指令，请自行承担相应后果（包括但不限于游戏封号）。\n"
+                + "4. 本应用不会收集您的任何个人信息。\n"
+                + "5. 开发者保留对本协议的最终解释权。\n"
+                + "6. 软件开发者：是白白吖（scpao5），QQ：771217201\n\n"
+                + "如您继续使用本应用，视为同意本协议。");
+        content.setTextSize(14);
+        content.setTextColor(Color.parseColor("#4B5563"));
+        content.setLineSpacing(dp(4), 1);
+        scrollView.addView(content);
+
+        View divider = new View(this);
+        divider.setBackgroundColor(Color.parseColor("#E5E7EB"));
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(1));
+        dividerParams.setMargins(0, dp(20), 0, dp(16));
+        divider.setLayoutParams(dividerParams);
+        mainLayout.addView(divider);
+
+        LinearLayout buttonBar = new LinearLayout(this);
+        buttonBar.setOrientation(LinearLayout.HORIZONTAL);
+        buttonBar.setGravity(Gravity.END);
+        mainLayout.addView(buttonBar);
+
+        Button rejectBtn = new Button(this);
+        rejectBtn.setText("拒绝");
+        rejectBtn.setTextColor(Color.parseColor("#6B7280"));
+        rejectBtn.setBackgroundColor(Color.TRANSPARENT);
+        rejectBtn.setPadding(dp(20), dp(8), dp(20), dp(8));
+        rejectBtn.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onResult(final boolean success, final String errorMsg) {
-                runOnUiThread(new Runnable() {
+            public void onClick(View v) {
+                finish();
+            }
+        });
+        buttonBar.addView(rejectBtn);
+
+        final Button agreeBtn = new Button(this);
+        agreeBtn.setText("同意 (10)");
+        agreeBtn.setTextColor(Color.parseColor("#2196F3"));
+        agreeBtn.setBackgroundColor(Color.TRANSPARENT);
+        agreeBtn.setEnabled(false);
+        agreeBtn.setPadding(dp(20), dp(8), dp(20), dp(8));
+        buttonBar.addView(agreeBtn);
+
+        dialog.setContentView(mainLayout);
+        dialog.show();
+
+        new CountDownTimer(10000, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                int seconds = (int) (millisUntilFinished / 1000);
+                agreeBtn.setText("同意 (" + seconds + ")");
+            }
+            @Override
+            public void onFinish() {
+                agreeBtn.setEnabled(true);
+                agreeBtn.setText("同意");
+                agreeBtn.setOnClickListener(new View.OnClickListener() {
                     @Override
-                    public void run() {
-                        if (success) {
-                            Toast.makeText(MainActivity.this, "提权成功", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(MainActivity.this, "提权失败: " + errorMsg, Toast.LENGTH_LONG).show();
-                        }
+                    public void onClick(View v) {
+                        SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
+                        prefs.edit().putBoolean("agreement_accepted", true).apply();
+                        initMainUI();
+                        dialog.dismiss();
                     }
                 });
             }
-        });
+        }.start();
     }
-
-private void showAgreementDialog() {
-    // 创建自定义 Dialog
-    final Dialog dialog = new Dialog(this);
-    dialog.setCancelable(false);
-    
-    if (dialog.getWindow() != null) {
-        dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-    }
-    
-    LinearLayout mainLayout = new LinearLayout(this);
-    mainLayout.setOrientation(LinearLayout.VERTICAL);
-    mainLayout.setBackgroundColor(Color.WHITE);
-    mainLayout.setPadding(dp(24), dp(20), dp(24), dp(20));
-    GradientDrawable bg = new GradientDrawable();
-    bg.setShape(GradientDrawable.RECTANGLE);
-    bg.setCornerRadius(dp(16));
-    bg.setColor(Color.WHITE);
-    mainLayout.setBackground(bg);
-    
-    TextView title = new TextView(this);
-    title.setText("用户协议");
-    title.setTextSize(20);
-    title.setTextColor(Color.parseColor("#1F2937"));
-    title.setTypeface(Typeface.DEFAULT_BOLD);
-    title.setGravity(Gravity.CENTER);
-    title.setPadding(0, 0, 0, dp(16));
-    mainLayout.addView(title);
-    
-    ScrollView scrollView = new ScrollView(this);
-    scrollView.setLayoutParams(new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(400)));
-    mainLayout.addView(scrollView);
-    
-    TextView content = new TextView(this);
-    content.setText("欢迎使用暗区指令工具！\n\n"
-            + "1. 本应用是开源软件，遵循 GNU General Public License v3.0 (GPL-3.0) 许可证。\n"
-            + "   您有权自由使用、修改、分发本软件，但任何修改后的版本也必须以 GPL-3.0 开源。\n"
-            + "   源代码地址：\n"
-            + "   GitHub: https://github.com/scpao5/aqzlgj/\n"
-            + "   Gitee: https://gitee.com/scpao5/aqzlgj/\n\n"
-            + "2. 任何个人或组织不得将本应用或其修改版本用于商业盈利目的（即“圈钱”），包括但不限于：\n"
-            + "   - 售卖 APK、收费提供下载\n"
-            + "   - 内置广告、收取会员费\n"
-            + "   - 以“代刷”、“代练”等名义变相收费\n\n"
-            + "3. 您通过本应用执行的所有指令，请自行承担相应后果（包括但不限于游戏封号）。\n"
-            + "4. 本应用不会收集您的任何个人信息。\n"
-            + "5. 开发者保留对本协议的最终解释权。\n"
-            + "6. 软件开发者：是白白吖（scpao5），QQ：771217201\n\n"
-            + "您如果想重新查看本协议，请清除应用数据\n\n"
-            + "如您继续使用本应用，视为同意本协议。");
-    content.setTextSize(14);
-    content.setTextColor(Color.parseColor("#4B5563"));
-    content.setLineSpacing(dp(4), 1);
-    scrollView.addView(content);
-    
-    View divider = new View(this);
-    divider.setBackgroundColor(Color.parseColor("#E5E7EB"));
-    LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(1));
-    dividerParams.setMargins(0, dp(20), 0, dp(16));
-    divider.setLayoutParams(dividerParams);
-    mainLayout.addView(divider);
-    
-    LinearLayout buttonBar = new LinearLayout(this);
-    buttonBar.setOrientation(LinearLayout.HORIZONTAL);
-    buttonBar.setGravity(Gravity.END);
-    mainLayout.addView(buttonBar);
-    
-    Button rejectBtn = new Button(this);
-    rejectBtn.setText("拒绝");
-    rejectBtn.setTextColor(Color.parseColor("#6B7280"));
-    rejectBtn.setBackgroundColor(Color.TRANSPARENT);
-    rejectBtn.setPadding(dp(20), dp(8), dp(20), dp(8));
-    rejectBtn.setOnClickListener(new View.OnClickListener() {
-        @Override
-        public void onClick(View v) {
-            finish();
-        }
-    });
-    buttonBar.addView(rejectBtn);
-    
-    final Button agreeBtn = new Button(this);
-    agreeBtn.setText("同意 (10)");   // 改为10秒提示
-    agreeBtn.setTextColor(Color.parseColor("#2196F3"));
-    agreeBtn.setBackgroundColor(Color.TRANSPARENT);
-    agreeBtn.setEnabled(false);
-    agreeBtn.setPadding(dp(20), dp(8), dp(20), dp(8));
-    buttonBar.addView(agreeBtn);
-    
-    dialog.setContentView(mainLayout);
-    dialog.show();
-    
-    // 倒计时改为10秒 (10000毫秒)
-    new CountDownTimer(10000, 1000) {
-        @Override
-        public void onTick(long millisUntilFinished) {
-            int seconds = (int) (millisUntilFinished / 1000);
-            agreeBtn.setText("同意 (" + seconds + ")");
-        }
-        @Override
-        public void onFinish() {
-            agreeBtn.setEnabled(true);
-            agreeBtn.setText("同意");
-            agreeBtn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    SharedPreferences prefs = getSharedPreferences("app_prefs", MODE_PRIVATE);
-                    prefs.edit().putBoolean("agreement_accepted", true).apply();
-                    initMainUI();
-                    dialog.dismiss();
-                }
-            });
-        }
-    }.start();
-}
 
     private void loadCategories() {
         List<String> categories = CodeData.getAllCategories();

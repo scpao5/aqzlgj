@@ -1,17 +1,19 @@
 农场|open Farmland_715_Main
-山谷|open Valley_715_Main
+旧山谷|open Valley_715_Main
 新山谷|open Valley_Main
-迷雾山谷|open UEDPIE_1_Valley_Main
 北部山区|open Lake_Main
 庭院|open DE_Yard_Main
 前线要塞|open Armory_Main
 电视台|open TVStation_Main
 军港|open CitySiege_Main
 矿区|open Breakout_Main
-训练场|open TutorialRange_Main
+旧训练场|open TutorialRange_Main
 新训练场|open Range_Main
-大厅|open FrontEndMap?goto=hallroom
+大厅主界面|open FrontEndMap?goto=hallroom
 AI测试地图|open Uam-AITest-WhiteFilm
+模式测试地图|open Uam-ModeLogicTest
+战斗测试地图|open Uam-BattleTest
+模型测试地图|open Uam-LDTestModel
 飞行模式|Fly
 幽灵模式|ghost
 取消飞行/取消幽灵模式|walk

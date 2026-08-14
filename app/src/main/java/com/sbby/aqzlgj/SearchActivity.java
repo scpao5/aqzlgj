@@ -200,7 +200,6 @@ public class SearchActivity extends Activity {
             titleLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
             itemView.addView(titleLayout);
 
-            // 复制图标（已删除 setColorFilter，使用矢量图自身颜色）
             ImageView copyIcon = new ImageView(SearchActivity.this);
             copyIcon.setImageResource(R.drawable.ic_copy);
             int iconSize = dp(32);
@@ -272,12 +271,8 @@ public class SearchActivity extends Activity {
             execBtn.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    if (PrivilegeManager.isReady()) {
-                        PrivilegeManager.sendBroadcast(code);
-                        Toast.makeText(SearchActivity.this, "执行: " + title, Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(SearchActivity.this, "未提权，无法执行", Toast.LENGTH_SHORT).show();
-                    }
+                    PrivilegeManager.sendCommand(code);
+                    Toast.makeText(SearchActivity.this, "执行: " + title, Toast.LENGTH_SHORT).show();
                 }
             });
 

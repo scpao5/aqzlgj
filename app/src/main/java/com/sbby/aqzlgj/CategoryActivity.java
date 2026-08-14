@@ -180,7 +180,6 @@ public class CategoryActivity extends Activity {
             titleLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
             itemView.addView(titleLayout);
 
-            // 复制图标（已删除 setColorFilter）
             ImageView copyIcon = new ImageView(CategoryActivity.this);
             copyIcon.setImageResource(R.drawable.ic_copy);
             int iconSize = dp(32);
@@ -243,12 +242,8 @@ public class CategoryActivity extends Activity {
             execBtn.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    if (PrivilegeManager.isReady()) {
-                        PrivilegeManager.sendBroadcast(code);
-                        Toast.makeText(CategoryActivity.this, "执行: " + title, Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(CategoryActivity.this, "未提权，无法执行", Toast.LENGTH_SHORT).show();
-                    }
+                    PrivilegeManager.sendCommand(code);
+                    Toast.makeText(CategoryActivity.this, "执行: " + title, Toast.LENGTH_SHORT).show();
                 }
             });
 

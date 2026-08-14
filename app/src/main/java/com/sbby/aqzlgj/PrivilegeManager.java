@@ -17,137 +17,143 @@
 package com.sbby.aqzlgj;
 
 import android.content.Context;
+import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
+import android.widget.Toast;
+
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 public class PrivilegeManager {
+    private static final String TAG = "PrivilegeManager";
+    private static Context sContext;
+    private static boolean hasSu = false;
+    private static boolean suChecked = false;
 
-    private static boolean isRishReady = false;
-    private static String rishPath;
-
-    public interface InitCallback {
-        void onResult(boolean success, String errorMsg);
-    }
-
-    public interface ExecCallback {
-        void onResult(boolean success, String output);
-    }
-
-    public static void init(final Context context, final InitCallback callback) {
+    public static void init(Context context) {
+        sContext = context.getApplicationContext();
         new Thread(new Runnable() {
             @Override
             public void run() {
-                String error = null;
-                boolean ok = false;
-                for (int attempt = 1; attempt <= 3; attempt++) {
-                    error = setupRish(context);
-                    if (error == null) {
-                        ok = true;
-                        break;
-                    }
-                    if (attempt < 3) {
-                        try { Thread.sleep(300); } catch (InterruptedException e) {}
-                    }
-                }
-                final boolean finalOk = ok;
-                final String finalError = error;
-                if (callback != null) {
-                    android.os.Handler mainHandler = new android.os.Handler(context.getMainLooper());
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            callback.onResult(finalOk, finalError);
-                        }
-                    });
+                hasSu = checkSu();
+                suChecked = true;
+                if (hasSu) {
+                    Log.i(TAG, "Root available, will use su -c for commands.");
+                    showToast("已检测到 root，将使用 su 执行指令");
+                } else {
+                    Log.i(TAG, "No root, will use normal broadcast.");
+                    showToast("未检测到 Root，将使用普通广播");
                 }
             }
         }).start();
     }
 
-    private static String setupRish(Context context) {
+    private static boolean checkSu() {
+        final boolean[] result = {false};
+        final CountDownLatch latch = new CountDownLatch(1);
+
+        Thread checker = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Process p = new ProcessBuilder("su", "-c", "echo test").start();
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                    String line = reader.readLine();
+                    int exitCode = p.waitFor();
+                    if (exitCode == 0 && line != null && line.contains("test")) {
+                        result[0] = true;
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "checkSu exception: " + e.getMessage());
+                } finally {
+                    latch.countDown();
+                }
+            }
+        });
+        checker.start();
+
         try {
-            // 使用内部私有目录 /data/user/0/com.sbby.aqzlgj/files
-            File internalDir = context.getFilesDir();
-            if (internalDir == null) return "无法获取内部私有目录";
-            File rishFile = new File(internalDir, "1.sh");
-            File dexFile = new File(internalDir, "1.dex");
-            rishPath = rishFile.getAbsolutePath();
-
-            copyAssetToFile(context, "1.sh", rishFile);
-            copyAssetToFile(context, "1.dex", dexFile);
-            dexFile.setReadOnly();
-
-            Process p = Runtime.getRuntime().exec(new String[]{"sh", rishPath, "-c", "echo 'RISH_OK'"});
-            int code = p.waitFor();
-            StringBuilder output = new StringBuilder();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line;
-            while ((line = reader.readLine()) != null) output.append(line);
-            reader.close();
-
-            StringBuilder error = new StringBuilder();
-            BufferedReader errReader = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-            while ((line = errReader.readLine()) != null) error.append(line);
-            errReader.close();
-
-            if (code != 0) {
-                return "退出码 " + code + "，错误: " + error.toString();
+            if (!latch.await(2, TimeUnit.SECONDS)) {
+                Log.w(TAG, "checkSu timeout, assume no root.");
+                checker.interrupt();
+                return false;
             }
-            if (output.indexOf("RISH_OK") == -1) {
-                return "输出不匹配: " + output.toString() + " (错误: " + error.toString() + ")";
-            }
-            isRishReady = true;
-            return null;
-        } catch (Exception e) {
-            return "初始化异常: " + e.getMessage();
+        } catch (InterruptedException e) {
+            Log.w(TAG, "checkSu interrupted");
         }
+        return result[0];
     }
 
-    private static void copyAssetToFile(Context context, String assetName, File target) throws Exception {
-        if (target.exists()) return;
-        InputStream is = context.getAssets().open(assetName);
-        FileOutputStream os = new FileOutputStream(target);
-        byte[] buf = new byte[8192];
-        int len;
-        while ((len = is.read(buf)) != -1) os.write(buf, 0, len);
-        os.close();
-        is.close();
-    }
+    public static void sendCommand(final String command) {
+        if (sContext == null) return;
 
-    public static boolean isReady() {
-        return isRishReady;
-    }
-
-    public static void execCommand(final String command, final ExecCallback callback) {
-        if (!isRishReady) {
-            if (callback != null) callback.onResult(false, "未提权");
+        if (!suChecked) {
+            sendBroadcast(command);
             return;
         }
+
+        if (hasSu) {
+            executeViaSu(command);
+        } else {
+            sendBroadcast(command);
+        }
+    }
+
+    private static void executeViaSu(final String command) {
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    Process p = Runtime.getRuntime().exec(new String[]{"sh", rishPath, "-c", command});
-                    p.waitFor();
-                    StringBuilder output = new StringBuilder();
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                    String line;
-                    while ((line = reader.readLine()) != null) output.append(line).append("\n");
-                    reader.close();
-                    boolean success = p.exitValue() == 0;
-                    if (callback != null) callback.onResult(success, output.toString());
+                    String safeCmd = command.replace("'", "'\\''");
+                    String amCmd = "am broadcast -a android.intent.action.RUN -e cmd '" + safeCmd + "'";
+                    Process p = new ProcessBuilder("su", "-c", amCmd).start();
+                    int exitCode = p.waitFor();
+                    if (exitCode == 0) {
+                        Log.i(TAG, "Su command executed: " + command);
+                        // 成功时不显示 Toast（应用层会显示指令标题）
+                    } else {
+                        BufferedReader errReader = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+                        StringBuilder err = new StringBuilder();
+                        String line;
+                        while ((line = errReader.readLine()) != null) {
+                            err.append(line);
+                        }
+                        errReader.close();
+                        Log.e(TAG, "Su failed, exit=" + exitCode + ", error=" + err.toString());
+                        showToast("su 执行失败，尝试普通广播");
+                        sendBroadcast(command);
+                    }
                 } catch (Exception e) {
-                    if (callback != null) callback.onResult(false, e.getMessage());
+                    Log.e(TAG, "Exception in su command", e);
+                    showToast("su 执行异常，使用普通广播");
+                    sendBroadcast(command);
                 }
             }
         }).start();
     }
 
-    public static void sendBroadcast(final String command) {
-        String escaped = "'" + command.replace("'", "'\\''") + "'";
-        execCommand("am broadcast -a android.intent.action.RUN -e cmd " + escaped, null);
+    private static void sendBroadcast(String command) {
+        if (sContext == null) return;
+        Intent intent = new Intent("android.intent.action.RUN");
+        intent.putExtra("cmd", command);
+        intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+        sContext.sendBroadcast(intent);
+        Log.i(TAG, "Broadcast sent: " + command);
+        // 不显示 Toast，让应用层显示指令标题
+    }
+
+    private static void showToast(final String msg) {
+        if (sContext == null) return;
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(sContext, msg, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 }
