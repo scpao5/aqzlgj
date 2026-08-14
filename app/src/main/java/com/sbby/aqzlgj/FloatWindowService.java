@@ -391,6 +391,10 @@ public class FloatWindowService extends Service {
         if (floatBackBtn != null) floatBackBtn.setVisibility(View.GONE);
         List<String> categories = CodeData.getAllCategories();
         for (final String cat : categories) {
+            // 跳过“大杂烩”分类
+            if (CodeData.CATEGORY_MIX.equals(cat)) {
+                continue;
+            }
             View row = makeRowButton(cat);
             row.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -462,6 +466,10 @@ public class FloatWindowService extends Service {
             floatListContainer.addView(empty);
         } else {
             for (CodeItem item : results) {
+                // 过滤掉大杂烩的搜索结果
+                if (CodeData.CATEGORY_MIX.equals(item.category)) {
+                    continue;
+                }
                 addItemRow(item.category, item.title, item.code);
             }
         }
@@ -494,6 +502,10 @@ public class FloatWindowService extends Service {
     }
 
     private void addItemRow(String categoryTag, final String title, final String code) {
+        // 如果 categoryTag 是大杂烩，不添加
+        if (CodeData.CATEGORY_MIX.equals(categoryTag)) {
+            return;
+        }
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
