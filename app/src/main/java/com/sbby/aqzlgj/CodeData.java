@@ -27,7 +27,7 @@ import java.util.List;
 
 public class CodeData {
     public static final String CATEGORY_BASIC = "刀皮类";
-    public static final String CATEGORY_STORAGE = "战术装备（含食品）";
+    public static final String CATEGORY_STORAGE = "战术装备";
     public static final String CATEGORY_NETWORK = "钥匙类";
     public static final String CATEGORY_FILE = "针剂类";
     public static final String CATEGORY_TOOLS = "操作指令";
@@ -99,7 +99,7 @@ public class CodeData {
                     final List<CodeItem> tempList = new ArrayList<>();
 
                     loadFileTo(context, "刀皮类.txt", CATEGORY_BASIC, tempList);
-                    loadFileTo(context, "战术装备含食物.txt", CATEGORY_STORAGE, tempList);
+                    loadFileTo(context, "战术装备.txt", CATEGORY_STORAGE, tempList);
                     loadFileTo(context, "钥匙类.txt", CATEGORY_NETWORK, tempList);
                     loadFileTo(context, "针剂类.txt", CATEGORY_FILE, tempList);
                     loadFileTo(context, "操作指令.txt", CATEGORY_TOOLS, tempList);

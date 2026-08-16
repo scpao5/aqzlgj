@@ -20,8 +20,10 @@ import android.app.Activity;
 import android.content.ClipboardManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
@@ -62,11 +64,12 @@ public class CategoryActivity extends Activity {
         titleBar.setGravity(android.view.Gravity.CENTER_VERTICAL);
         topBar.addView(titleBar);
 
-        TextView backBtn = new TextView(this);
-        backBtn.setText("<");
-        backBtn.setTextColor(Color.WHITE);
-        backBtn.setTextSize(22);
+        // 返回按钮（矢量图标）
+        ImageView backBtn = new ImageView(this);
+        backBtn.setImageResource(R.drawable.ic_arrow_back);
         backBtn.setPadding(0, 0, dp(15), 0);
+        backBtn.setScaleType(ImageView.ScaleType.CENTER);
+        backBtn.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48)));
         backBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -175,47 +178,78 @@ public class CategoryActivity extends Activity {
             }
 
             final Map<String, String> data = dataList.get(position);
+            final String code = data.get("code");
+            final String title = data.get("title");
+
             LinearLayout titleLayout = new LinearLayout(CategoryActivity.this);
             titleLayout.setOrientation(LinearLayout.HORIZONTAL);
             titleLayout.setGravity(android.view.Gravity.CENTER_VERTICAL);
             itemView.addView(titleLayout);
 
+            // 复制图标
             ImageView copyIcon = new ImageView(CategoryActivity.this);
             copyIcon.setImageResource(R.drawable.ic_copy);
-            int iconSize = dp(32);
+            int iconSize = dp(28);
             copyIcon.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
-            copyIcon.setPadding(0, 0, dp(10), 0);
+            copyIcon.setPadding(0, 0, dp(6), 0);
             copyIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
             titleLayout.addView(copyIcon);
 
             TextView titleText = new TextView(CategoryActivity.this);
-            titleText.setText(data.get("title"));
-            titleText.setTextSize(16);
+            titleText.setText(title);
+            titleText.setTextSize(15);
             titleText.setTextColor(Color.parseColor("#424242"));
             titleText.setTypeface(Typeface.DEFAULT_BOLD);
             titleText.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
             titleLayout.addView(titleText);
 
-            Button copyBtn = new Button(CategoryActivity.this);
-            copyBtn.setText("复制");
-            copyBtn.setTextSize(12);
-            copyBtn.setBackgroundColor(Color.parseColor("#4CAF50"));
-            copyBtn.setTextColor(Color.WHITE);
-            copyBtn.setPadding(dp(12), dp(4), dp(12), dp(4));
-            copyBtn.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            titleLayout.addView(copyBtn);
+            // 复制按钮
+            TextView copyTv = new TextView(CategoryActivity.this);
+            copyTv.setText("复制");
+            copyTv.setTextSize(13);
+            copyTv.setTextColor(Color.WHITE);
+            copyTv.setGravity(Gravity.CENTER);
+            copyTv.setPadding(dp(10), dp(8), dp(10), dp(8));
+            copyTv.setMinWidth(0);
+            copyTv.setMinHeight(0);
+            copyTv.setBackground(new ColorDrawable(Color.parseColor("#4CAF50")));
+            copyTv.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            copyTv.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    cm.setText(code);
+                    Toast.makeText(CategoryActivity.this, "已复制: " + title, Toast.LENGTH_SHORT).show();
+                }
+            });
+            titleLayout.addView(copyTv);
 
-            Button execBtn = new Button(CategoryActivity.this);
-            execBtn.setText("执行");
-            execBtn.setTextSize(12);
-            execBtn.setBackgroundColor(Color.parseColor("#2196F3"));
-            execBtn.setTextColor(Color.WHITE);
-            execBtn.setPadding(dp(12), dp(4), dp(12), dp(4));
-            execBtn.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            titleLayout.addView(execBtn);
+            // 执行按钮
+            TextView execTv = new TextView(CategoryActivity.this);
+            execTv.setText("执行");
+            execTv.setTextSize(13);
+            execTv.setTextColor(Color.WHITE);
+            execTv.setGravity(Gravity.CENTER);
+            execTv.setPadding(dp(10), dp(8), dp(10), dp(8));
+            execTv.setMinWidth(0);
+            execTv.setMinHeight(0);
+            execTv.setBackground(new ColorDrawable(Color.parseColor("#2196F3")));
+            execTv.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            execTv.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    PrivilegeManager.sendCommand(code);
+                    Toast.makeText(CategoryActivity.this, "执行: " + title, Toast.LENGTH_SHORT).show();
+                }
+            });
+            titleLayout.addView(execTv);
 
             TextView codeText = new TextView(CategoryActivity.this);
-            codeText.setText(data.get("code"));
+            codeText.setText(code);
             codeText.setTextSize(13);
             codeText.setTextColor(Color.parseColor("#666666"));
             codeText.setBackgroundColor(Color.parseColor("#F5F5F5"));
@@ -226,26 +260,6 @@ public class CategoryActivity extends Activity {
             codeParams.setMargins(0, dp(10), 0, 0);
             codeText.setLayoutParams(codeParams);
             itemView.addView(codeText);
-
-            final String code = data.get("code");
-            final String title = data.get("title");
-
-            copyBtn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    cm.setText(code);
-                    Toast.makeText(CategoryActivity.this, "已复制: " + title, Toast.LENGTH_SHORT).show();
-                }
-            });
-
-            execBtn.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    PrivilegeManager.sendCommand(code);
-                    Toast.makeText(CategoryActivity.this, "执行: " + title, Toast.LENGTH_SHORT).show();
-                }
-            });
 
             return itemView;
         }

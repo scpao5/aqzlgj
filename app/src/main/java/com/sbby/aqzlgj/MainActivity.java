@@ -252,9 +252,9 @@ public class MainActivity extends Activity {
     private void refreshFloatButtonText() {
         if (floatToggleBtn != null) {
             if (FloatWindowService.isRunning) {
-                floatToggleBtn.setText("关闭悬浮");
+                floatToggleBtn.setText("关闭悬浮窗");
             } else {
-                floatToggleBtn.setText("开启悬浮");
+                floatToggleBtn.setText("开启悬浮窗");
             }
         }
     }
@@ -441,10 +441,12 @@ public class MainActivity extends Activity {
             name.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
             itemView.addView(name);
 
-            TextView arrow = new TextView(MainActivity.this);
-            arrow.setText(">");
-            arrow.setTextSize(20);
-            arrow.setTextColor(Color.parseColor("#BDBDBD"));
+            // 右箭头（矢量图标）
+            ImageView arrow = new ImageView(MainActivity.this);
+            arrow.setImageResource(R.drawable.ic_arrow_forward);
+            arrow.setColorFilter(Color.parseColor("#BDBDBD"));
+            arrow.setScaleType(ImageView.ScaleType.CENTER);
+            arrow.setLayoutParams(new LinearLayout.LayoutParams(dp(24), dp(24)));
             itemView.addView(arrow);
 
             final String category = data.get("name");

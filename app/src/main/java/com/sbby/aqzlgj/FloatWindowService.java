@@ -39,6 +39,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -64,14 +65,14 @@ public class FloatWindowService extends Service {
 
     private LinearLayout floatHeader;
     private TextView floatTitle;
-    private TextView floatArrow;
-    private Button floatCloseBtn;
+    private ImageView floatArrowIv;
+    private ImageView floatCloseIv;
+    private ImageView floatBackIv;
     private LinearLayout floatExpandArea;
     private EditText floatInput;
     private Button floatSearchBtn;
     private LinearLayout floatListContainer;
     private ScrollView floatListScroll;
-    private Button floatBackBtn;
 
     private boolean expanded = false;
     private int listState = 0;
@@ -185,6 +186,7 @@ public class FloatWindowService extends Service {
         floatView.addView(floatHeader, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        // 标题
         floatTitle = new TextView(this);
         floatTitle.setText("指令工具");
         floatTitle.setTextSize(13);
@@ -195,30 +197,36 @@ public class FloatWindowService extends Service {
         floatTitle.setEllipsize(TextUtils.TruncateAt.END);
         floatHeader.addView(floatTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
-        floatArrow = new TextView(this);
-        floatArrow.setText("⌄");
-        floatArrow.setTextSize(16);
-        floatArrow.setTextColor(0xFF2196F3);
-        floatArrow.setGravity(Gravity.CENTER);
-        floatArrow.setPadding(dp(8), 0, dp(8), 0);
-        floatHeader.addView(floatArrow, new LinearLayout.LayoutParams(dp(28), dp(28)));
+        // 箭头图标（灰色）
+        floatArrowIv = new ImageView(this);
+        floatArrowIv.setImageResource(R.drawable.ic_arrow_down);
+        floatArrowIv.setColorFilter(Color.parseColor("#BDBDBD"));
+        floatArrowIv.setPadding(dp(8), dp(8), dp(8), dp(8));
+        floatArrowIv.setScaleType(ImageView.ScaleType.CENTER);
+        floatArrowIv.setLayoutParams(new LinearLayout.LayoutParams(dp(28), dp(28)));
+        floatArrowIv.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                releaseInputFocusAndRestore();
+                toggleExpand();
+            }
+        });
+        floatHeader.addView(floatArrowIv);
 
-        floatCloseBtn = new Button(this);
-        floatCloseBtn.setText("✕");
-        floatCloseBtn.setTextSize(12);
-        floatCloseBtn.setTextColor(0xFFFFFFFF);
-        floatCloseBtn.setBackground(createRoundDrawable(0xFFF44336, dp(14)));
-        floatCloseBtn.setPadding(dp(8), dp(2), dp(8), dp(2));
-        LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(dp(28), dp(28));
-        closeParams.leftMargin = dp(4);
-        floatCloseBtn.setLayoutParams(closeParams);
-        floatCloseBtn.setOnClickListener(new View.OnClickListener() {
+        // 关闭图标（红色）
+        floatCloseIv = new ImageView(this);
+        floatCloseIv.setImageResource(R.drawable.ic_close);
+        floatCloseIv.setColorFilter(Color.parseColor("#F44336"));
+        floatCloseIv.setPadding(dp(8), dp(8), dp(8), dp(8));
+        floatCloseIv.setScaleType(ImageView.ScaleType.CENTER);
+        floatCloseIv.setLayoutParams(new LinearLayout.LayoutParams(dp(28), dp(28)));
+        floatCloseIv.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 showCloseConfirmDialog();
             }
         });
-        floatHeader.addView(floatCloseBtn);
+        floatHeader.addView(floatCloseIv);
 
         floatExpandArea = new LinearLayout(this);
         floatExpandArea.setOrientation(LinearLayout.VERTICAL);
@@ -269,14 +277,6 @@ public class FloatWindowService extends Service {
         floatListContainer.setPadding(dp(2), dp(2), dp(2), dp(2));
         floatListScroll.addView(floatListContainer, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        floatArrow.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                releaseInputFocusAndRestore();
-                toggleExpand();
-            }
-        });
 
         floatSearchBtn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -330,14 +330,16 @@ public class FloatWindowService extends Service {
         expanded = !expanded;
         if (expanded) {
             floatExpandArea.setVisibility(View.VISIBLE);
-            floatArrow.setText("⌃");
+            floatArrowIv.setImageResource(R.drawable.ic_arrow_up);
+            floatArrowIv.setColorFilter(Color.parseColor("#BDBDBD"));
             updateLayoutByContent();
             if (floatListContainer.getChildCount() == 0) {
                 showCategoryList();
             }
         } else {
             floatExpandArea.setVisibility(View.GONE);
-            floatArrow.setText("⌄");
+            floatArrowIv.setImageResource(R.drawable.ic_arrow_down);
+            floatArrowIv.setColorFilter(Color.parseColor("#BDBDBD"));
             layoutParams.height = dp(HEIGHT_COLLAPSED_DP);
             try {
                 windowManager.updateViewLayout(floatView, layoutParams);
@@ -388,10 +390,9 @@ public class FloatWindowService extends Service {
         currentCategory = null;
         updateFloatTitle();
         floatListContainer.removeAllViews();
-        if (floatBackBtn != null) floatBackBtn.setVisibility(View.GONE);
+        if (floatBackIv != null) floatBackIv.setVisibility(View.GONE);
         List<String> categories = CodeData.getAllCategories();
         for (final String cat : categories) {
-            // 跳过“大杂烩”分类
             if (CodeData.CATEGORY_MIX.equals(cat)) {
                 continue;
             }
@@ -414,7 +415,7 @@ public class FloatWindowService extends Service {
         updateFloatTitle();
         floatListContainer.removeAllViews();
         ensureBackBtn();
-        floatBackBtn.setVisibility(View.VISIBLE);
+        floatBackIv.setVisibility(View.VISIBLE);
         List<CodeItem> items = CodeData.getCodesByCategory(this, category);
         if (items.isEmpty()) {
             TextView empty = new TextView(this);
@@ -455,7 +456,7 @@ public class FloatWindowService extends Service {
         floatTitle.setText("搜索结果");
         floatListContainer.removeAllViews();
         ensureBackBtn();
-        floatBackBtn.setVisibility(View.VISIBLE);
+        floatBackIv.setVisibility(View.VISIBLE);
         List<CodeItem> results = CodeData.searchCodes(this, kw);
         if (results.isEmpty()) {
             TextView empty = new TextView(this);
@@ -466,7 +467,6 @@ public class FloatWindowService extends Service {
             floatListContainer.addView(empty);
         } else {
             for (CodeItem item : results) {
-                // 过滤掉大杂烩的搜索结果
                 if (CodeData.CATEGORY_MIX.equals(item.category)) {
                     continue;
                 }
@@ -478,17 +478,16 @@ public class FloatWindowService extends Service {
     }
 
     private void ensureBackBtn() {
-        if (floatBackBtn == null) {
-            floatBackBtn = new Button(this);
-            floatBackBtn.setText("←");
-            floatBackBtn.setTextSize(12);
-            floatBackBtn.setTextColor(0xFFFFFFFF);
-            floatBackBtn.setBackground(createRoundDrawable(0xFF2196F3, dp(8)));
-            floatBackBtn.setPadding(dp(8), dp(4), dp(8), dp(4));
+        if (floatBackIv == null) {
+            floatBackIv = new ImageView(this);
+            floatBackIv.setImageResource(R.drawable.ic_arrow_back);
+            floatBackIv.setColorFilter(Color.parseColor("#BDBDBD"));
+            floatBackIv.setPadding(dp(8), dp(4), dp(8), dp(4));
+            floatBackIv.setScaleType(ImageView.ScaleType.CENTER);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(32), dp(30));
             lp.leftMargin = dp(4);
-            floatBackBtn.setLayoutParams(lp);
-            floatBackBtn.setOnClickListener(new View.OnClickListener() {
+            floatBackIv.setLayoutParams(lp);
+            floatBackIv.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     showCategoryList();
@@ -496,13 +495,12 @@ public class FloatWindowService extends Service {
             });
             ViewGroup inputRow = (ViewGroup) floatInput.getParent();
             if (inputRow != null) {
-                inputRow.addView(floatBackBtn, 0);
+                inputRow.addView(floatBackIv, 0);
             }
         }
     }
 
     private void addItemRow(String categoryTag, final String title, final String code) {
-        // 如果 categoryTag 是大杂烩，不添加
         if (CodeData.CATEGORY_MIX.equals(categoryTag)) {
             return;
         }
