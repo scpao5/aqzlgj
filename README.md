@@ -1,5 +1,11 @@
 # 暗区指令工具
 
+> [!IMPORTANT]
+> **本仓库已停止维护，项目已迁移至 [github.com/scpao5/aqzlgj-kotlin](https://github.com/scpao5/aqzlgj-kotlin)**
+> 新版采用 Kotlin + Compose 重写，包含悬浮窗、分类搜索、主题适配等完整功能，请前往新仓库获取最新版本。
+
+
+
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Android](https://img.shields.io/badge/Android-7.0%2B-brightgreen)](https://developer.android.com/about/versions/android-7.0)
 [![Release](https://img.shields.io/github/v/release/scpao5/aqzlgj)](https://github.com/scpao5/aqzlgj/releases)
